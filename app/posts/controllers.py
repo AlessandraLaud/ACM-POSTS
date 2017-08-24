@@ -7,7 +7,7 @@ posts = Blueprint('posts', __name__)
 
 @posts.route('/new', methods=['POST'])
 def add_post():
-    return pass
+    pass
 
 @posts.route('/<id>', methods=['GET'])
 def get_post(id):
