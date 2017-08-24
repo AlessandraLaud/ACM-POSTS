@@ -1,13 +1,13 @@
 # posts/controllers.py
 # Written by Jeff Kaleshi
 
-from flask import Blueprint
+from flask import Blueprint, jsonify, request
 
 posts = Blueprint('posts', __name__)
 
 @posts.route('/new', methods=['POST'])
 def add_post():
-    pass
+    return pass
 
 @posts.route('/<id>', methods=['GET'])
 def get_post(id):
