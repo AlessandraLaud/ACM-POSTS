@@ -102,3 +102,6 @@ ENV/
 
 # visual studio code
 .vscode/
+
+# Upload folder
+.Uploads/
