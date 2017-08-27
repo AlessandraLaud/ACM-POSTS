@@ -6,38 +6,31 @@ import hashlib
 from datetime import date
 from time import time
 
-from flask import current_app
+from flask import current_app, url_for
 from werkzeug.utils import secure_filename
 
 from app import db
 
-IMAGE_EXTENSIONS = [
-    'png',
-    'jpg',
-    'jpeg',
-    'gif',
-]
-
-DOCUMENT_EXTENSIONS = [
-    'text',
-    'pdf',
-    'doc',
-    'xls',
-    'ppt',
-]
-
-def get_post_from_form(form):
+def get_post_with_urls(post):
     '''
-        Retrieve the post from the form
-        :form: MultiDict
-        :return: {}
+    Get the post with image/docuents's corresponding urls
+    :post: {}
+    :return: {}
     '''
-    post = {
-        'body': form['body'],
-        'author': form['author'],
-        'title': form['title'],
-        'type': form['type'],  
-    }
+    image_paths = post.images
+    document_paths = post.documents
+
+    if image_paths:
+        images = []
+        for path in image_paths:
+            images.append(url_for('uploads.get_file', filename=path, _external=True))
+        
+        documents = []
+        for path in document_paths:
+            documents.append(url_for('uploads.get_file', filename=path, _external=True))
+        
+        post.documents = documents
+        post.images = images
 
     return post
 
@@ -61,48 +54,6 @@ def generate_folder_path(folder_name, username):
         )
     return path
 
-def valid_file(filename, extensions):
-    '''
-        Checks if the file extension is valid
-        :filename: String
-        :extensions: [str, str, ...]
-        :return: boolean
-    '''
-    
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in extensions
-
-def validate_form(form):
-    '''
-        Checks if the form contains the required fields
-        :form: MultiDict
-        :return: String
-    '''
-
-    message = ''
-    if 'body' not in form or 'title' not in form or 'type' not in form:
-        message = 'One or more required fields are missing!'
-
-    return message
-
-def validate_files(files, file_type, allowed_extensions):
-    '''
-        Checks if files is valid based on the 
-        file extension type passed in
-        :files: MultiDict
-        :file_type: String
-        :allowed_extensions: [str, str, ...]
-        :return: String
-    '''
-
-    message = ''
-    for file in files:
-        if not valid_file(file.filename, allowed_extensions):
-            files_valid = False
-            message = 'One or more {} have an invalid extension!'.format(file_type)
-            break
-    
-    return message
 
 def save_files(files, folder_name, username):
     '''
@@ -112,8 +63,6 @@ def save_files(files, folder_name, username):
         :username: String
         :return: [str, str, ...]
     '''
-    
-    all_files_valid = True
     images = []
     
     if len(files) > 0:
@@ -133,4 +82,41 @@ def save_files(files, folder_name, username):
     
     return images
 
-    
+def create_posts_dictionary(posts):
+    '''
+        Takes in a list of posts and returns a list
+        of dictionaries containing post information
+        :posts: [post, post, ...]
+        :return: [{}, {}, ...]
+    '''
+    posts_data = []
+    for post in posts:
+        post = get_post_with_urls(post)
+        posts_data.append(post.get_json())
+
+    return posts_data
+
+
+def save_post(post_data):
+    '''
+    Save the post
+    :post_data: {}
+    :return: {}
+    '''
+    image_paths = []
+    document_paths = []
+
+    if post_data['images'] != None:
+        image_paths = save_files(
+            post_data['images'], 'images', post_data['author'])
+    if post_data['documents'] != None:
+        document_paths = save_files(
+            post_data['documents'], 'documents', post_data['author'])
+
+    post_data['images'] = image_paths
+    post_data['documents'] = document_paths
+    post_data['time'] = int(time())
+
+    post = db.add_post(post_data)
+
+    return post

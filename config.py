@@ -1,3 +1,5 @@
+# Written by Jeff Kaleshi
+
 import os
 
 class Config:
@@ -6,7 +8,7 @@ class Config:
     DB_NAME = os.environ['DB_NAME']
     UPLOAD_PATH = os.environ['UPLOAD_PATH']
     
-
+    
 class DevelopmentConfig(Config):
     DEBUG = True
 

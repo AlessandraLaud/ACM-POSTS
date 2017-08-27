@@ -14,7 +14,6 @@ def create_app(environment):
     :environment: server environment
     :return: Flask App
     '''
-
     app = Flask(__name__)
     app.config.from_object(config[environment])
 

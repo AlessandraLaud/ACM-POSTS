@@ -6,77 +6,121 @@ from time import time
 
 from flask import Blueprint, jsonify, request
 
-from app import db 
-from .util import (get_post_from_form, save_files, IMAGE_EXTENSIONS,
-                   DOCUMENT_EXTENSIONS, validate_files, validate_form)
+from app import db
+from .input_parsers import get_n_posts_parser, add_post_parser, \
+                           update_post_parser
+from .validate import validate_new_post, validate_update_post
+from .util import save_files, create_posts_dictionary, \
+                  get_post_with_urls, save_post
+from .models import ID, Post
+
 
 posts = Blueprint('posts', __name__)
 
 @posts.route('/new', methods=['POST'])
-def add_post():   
-    
-    images = request.files.getlist('images')
-    documents = request.files.getlist('documents')
+def add_post():
+    '''
+    Add a new post
+    :return: Json object
+    '''   
     response = {'errors': [], 'post': {}}
 
-    # validate images and documents
-    form_valid = validate_form(request.form)
-    images_valid = validate_files(images, 'images', IMAGE_EXTENSIONS)
-    documents_valid = validate_files(documents, 'documents', DOCUMENT_EXTENSIONS)
+    # parse request
+    post_data = add_post_parser(request)
 
-    if form_valid != '':
-        response['errors'].append(form_valid)
-    if images_valid != '':
-        response['errors'].append(images_valid)
-    if documents_valid != '':
-        response['errors'].append(documents_valid)
-    
-    if len(response) == 0: 
-        post = get_post_from_form(request.form)
-        images_path = save_files(images, 'images', 'jkales2')
-        documents_path = save_files(documents, 'documents', 'jkales2')
-        post['images'] = images_path
-        post['documents'] = documents_path
-        post['time'] = int(time())
-        response['post'] = db.add_post(post)
+    # validate post data
+    errors = validate_new_post(post_data)
 
+    # set author and author_id
+    post_data['author']= 'test'
+    post_data['author_id'] = '00000'
+
+    if errors:
+        response['errors'] = errors
+    else:
+        try:
+            post = save_post(post_data)
+            post = get_post_with_urls(post)
+            response['post'] = post.get_json()
+        except Exception:
+            response['errors'].append('Could not save post to database!')
+        
     return jsonify(response)
 
-@posts.route('/<id>', methods=['GET'])
+@posts.route('/id/<id>', methods=['GET'])
 def get_post(id):
     '''
     Get the post that corresponds to the id passed in 
     :id: String
-    :return: json object
+    :return: Json object
     '''
+    response = {'errors': [], 'post': None}
 
-    post = db.get_post(id)
-    return jsonify(post)
-
-@posts.route('/', methods=['GET'])
-def get_n_posts():
-
-    start_time = request.args.get('startTime')
-    start_post = request.args.get('startPost')
-    num_posts = request.args.get('numPosts')
-    response = {'errors': [], 'posts': []}
-
-    if start_time == None:
-        response['errors'].append('Missing startTime!')
-    if start_post == None:
-        response['errors'].append('Missing startPost!')
-    if num_posts == None:
-        response['errors'].append('Missing numPosts!')
-
-    if len(response['errors']) == 0:
-        response['posts'] = db.get_n_posts(int(start_post), int(start_time), int(num_posts))
+    try:
+        posts = db.search_posts(id, ID)
+        if posts:
+            response['post'] = get_post_with_urls(posts[0]).get_json()
+        else:
+            response['errors'].append('Invalid Id!')
+    except Exception:
+        response['errors'].append('Could not get post from database!')
 
     return jsonify(response)
 
-@posts.route('/<id>', methods=['PUT'])
-def update_post(id):
-    pass
+@posts.route('/', methods=['GET'])
+def get_n_posts():
+    '''
+    Get the specified number of posts that corresponds to the id passed in 
+    :return: Json object
+    '''
+    response = {'errors': [], 'posts': []}
+    
+    try:
+        posts = db.search_posts(**get_n_posts_parser(request))
+        response['posts'] = create_posts_dictionary(posts)
+    except Exception:
+        response['errors'] = 'Could get posts from database!'
+    
+    return jsonify(response)
 
-@posts.route('/<id>', methods=['DELETE'])
+@posts.route('/id/<id>', methods=['PUT'])
+def update_post(id):
+    '''
+    Update an edited post
+    :id: String
+    :return: Json object
+    '''
+    response = {'errors': [], 'post': None}
+    updated_fields = update_post_parser(request)
+    error = validate_update_post(updated_fields)
+    
+    if error:
+        response['errors'].append(error)
+    else:
+        post = db.update_post(id, updated_fields)
+        if post:
+            response['post'] = post.get_json()
+        else:
+            response['errors'].append('Invalid Id!')
+        
+
+    return jsonify(response)
+
+
+@posts.route('/id/<id>', methods=['DELETE'])
 def delete_post(id):
-    pass
+    '''
+    Delete a post
+    :id: String
+    :return:
+    '''
+    response = {'errors': [], 'post': None}
+    try:
+        post = db.delete_post(id)
+        if post:
+            response['post'] = post.get_json()
+        else:
+            response['errors'].append('Invalid Id!')
+    except Exception:
+        response['errors'].append('Could not delete post from database!')
+    return jsonify(response) 

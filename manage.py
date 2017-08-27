@@ -1,3 +1,5 @@
+# Written by Jeff Kaleshi
+
 import os
 
 from flask_script import Manager
