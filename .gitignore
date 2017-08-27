@@ -104,4 +104,7 @@ ENV/
 .vscode/
 
 # Upload folder
-.Uploads/
+Uploads/
+
+# OSX files
+.DS_Store
